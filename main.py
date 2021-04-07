@@ -1,6 +1,11 @@
+import time
+
 import torch
 import gym
+from PIL import Image
 import matplotlib.pyplot as plt
+from gym.spaces import Box
+from gym.wrappers import FrameStack
 from torchvision import transforms as T
 import numpy as np
 import vizdoomgym
@@ -27,14 +32,25 @@ class Grayscale(gym.Wrapper):
         gray_sc_img = transform(gray_sc_img)
         return gray_sc_img, reward, done, info
 
+    def visualize(self, state):
+        state = state.numpy()                   # We need to first convert the tensor back to a numpy vector
+        state = np.transpose(state, (1, 2, 0))  # We then need to undo our format change
+        data = np.squeeze(state,axis=2)         # This is done as a workaround against a pillow bug when dealing with images with one channel
+        image = Image.fromarray(data.astype(np.uint8))
+        image.show()
+        image.close()
+        time.sleep(4)
+
+
 
 env = Grayscale(env)
 
 while True:
     next_state, reward, done, info = env.step(env.action_space.sample())
     env.render()
-    # To visualize the grayscale equivalent, the blue hue is caused by the way matplotlib lib renders the images
-    plt.imshow(next_state.squeeze(0))
-    plt.show()
+    # To visualize the grayscale equivalent.
+    Grayscale(env).visualize(next_state)
+
     if done:
         env.reset()
+
