@@ -35,6 +35,26 @@ class GrayScaleObservation(gym.ObservationWrapper):
         observation = transform(observation)
         return observation
 
+
+def visualize(state, i):
+    state = state.__array__()
+    # print(state.shape)
+    # print('state before', state)
+    state = state[0]
+    # print(state.shape)
+    # print('\n')
+    # print('state after', state)
+
+    # state = np.squeeze(state, axis=0)
+    # state = state.squeeze(0, axis= 3)
+    # state = np.transpose(state, (1, 2, 0))              # We then need to undo our format change
+    # data = np.squeeze(state,
+    #                   axis=2)                           # This is done as a workaround against a pillow bug when dealing with images with one channel
+    image = Image.fromarray(state.astype(np.uint8))
+    # print(state)
+    image.save(f'test_images/frame{i}.png')
+
+
 class SkipFrame(gym.Wrapper):
 
     def __init__(self, env, skip):
@@ -55,22 +75,36 @@ class SkipFrame(gym.Wrapper):
         return obs, total_reward, done, info
 
 
+class ResizeObservation(gym.ObservationWrapper):
+    def __init__(self, env, shape):
+        super().__init__(env)
+        self.shape = shape
 
 
-# state.shape = (240, 320, 3)
+        obs_shape = self.shape + self.observation_space.shape[2:]
+        self.observation_space = Box(low=0, high=255, shape=obs_shape, dtype=np.uint8)
 
-# use like a normal Gym environment
+    def observation(self, observation):
+        transforms = T.Compose(
+            [T.Resize(self.shape), T.Normalize(0, 255)]
+        )
+        # Uncomment this is for visualization
+        # transforms = T.Resize(self.shape)
+        observation = transforms(observation).squeeze(0)
+        return observation
+
 
 env = SkipFrame(env, skip=4)
 env = GrayScaleObservation(env)
+env = ResizeObservation(env, shape=(120, 160))
 env = FrameStack(env, num_stack=4)
 env.reset()
 
-while True:
+for i in range(100):
     state, reward, done, info = env.step(env.action_space.sample())
-    # print(state, reward, done, info)
-    print(state.shape)
     env.render()
+    # print(state.shape)
+    visualize(state, i)
 
     if done:
         env.reset()
