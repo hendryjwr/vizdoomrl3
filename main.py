@@ -43,6 +43,7 @@ class Grayscale(gym.Wrapper):
 
 
 
+
 env = Grayscale(env)
 
 while True:
