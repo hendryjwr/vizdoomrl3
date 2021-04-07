@@ -20,6 +20,7 @@ class Grayscale(gym.Wrapper):
     def step(self, action):
         # We reimplement the step function to convert all states into grayscale equivalents
         next_state, reward, done, info = self.env.step(action)
+        # The state has the format (height, width, channel) while pytorch takes as input (channel, height, width)
         gray_sc_img = np.transpose(next_state, (2, 0, 1))
         gray_sc_img = torch.tensor(gray_sc_img.copy(), dtype=torch.float)
         transform = T.Grayscale()
