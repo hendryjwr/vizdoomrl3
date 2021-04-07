@@ -15,5 +15,6 @@ while True:
     if done:
         env.reset()
 
+print("test")
 
 env.close()
