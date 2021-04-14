@@ -135,7 +135,6 @@ class DoomAgent:
         self.state_dim = state_dim
         self.action_dim = action_dim
         # self.save_dir = save_dir
-        self.experience = ExperienceReplay()
 
         # Learning Parameters
         self.gamma = 0.99
@@ -144,7 +143,7 @@ class DoomAgent:
         self.epsilon_rate_decay = 0.99999975
         self.epsilon_rate_min = 0.1
 
-        self.learn_every = 4
+        self.learn_every = 3
 
         # Syncing parameters
         self.syncing_frequency = 10000
@@ -192,21 +191,19 @@ class DoomAgent:
         return action_idx
 
     def learn(self):
-
         if self.curr_step % self.learn_every != 0:
             return
-
         if self.curr_step < 10000:
             return
 
         # Step 1: Recall from memory
-        current_state_array, new_state_array, action_array, reward_array, done_array = self.experience.recall()
+        current_state_array, new_state_array, action_array, reward_array, done_array = experience.recall()
 
         # Step 2: Calculate TD estimate based on the online network
         current_q_values = self.td_estimate(current_state_array, action_array)
 
         # Step 3: Calculate TD target
-        target_q_values = self.td_target(new_state_array, reward_array, done_array)
+        target_q_values = self.td_target(new_state_array, reward_array, done_array)        
 
         # Step 4: Perform gradient descent
         self.update(current_q_values, target_q_values)
@@ -222,8 +219,6 @@ class DoomAgent:
         return current_q_values
 
     def td_target(self, next_state, reward, done):
-        if done:
-            return reward
 
         future_q_values = self.neural_net(next_state, "online")
         best_action_array = torch.argmax(future_q_values, axis=1)
@@ -231,13 +226,13 @@ class DoomAgent:
         indexing_array = np.arange(0, mini_batch_size)
         target_q_values = self.neural_net(next_state, "target")[indexing_array, best_action_array]
 
-        return (reward + self.gamma * target_q_values).to(torch.float32)
+        return (reward + (1 - done.float()) * self.gamma * target_q_values).to(torch.float32)
 
     def update(self, current_q_values, target_q_values):
 
         # Here parameter = neural network weights
         loss = self.loss_func(current_q_values, target_q_values)
-        loss.backwards()
+        loss.backward()
         self.optimizer.step()
         self.optimizer.zero_grad()
         print(loss.item())
@@ -297,7 +292,6 @@ def play():
             new_state, reward, done, info = env.step(action)
             experience.cache(state, new_state, action, reward, done)
             ddqn_agent.learn()
-            ddqn_agent.curr_step += 1
             state = new_state
 
             # Step 1 Calculate td_estimate
@@ -307,7 +301,7 @@ def play():
             # Step 5 Sync online and target networks
             # Step 6 make new state, old state
 
-            visualise(state, i)
+            # visualise(state, i)
 
             if done:
                 break
