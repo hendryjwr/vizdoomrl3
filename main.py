@@ -7,6 +7,7 @@ import vizdoomgym
 from pathlib import Path
 from collections import deque
 import random, datetime, os, copy
+from torchsummary import summary
 
 # Gym is an OpenAI toolkit for RL
 import gym
@@ -21,10 +22,10 @@ class ImagePreProcessing(gym.ObservationWrapper):
     def __init__(self, env, shape):
         super().__init__(env)
         self.resize_shape = shape
+        height, width, _ = env.observation_space.shape
         self.observation_space = Box(0, 255, shape=self.resize_shape, dtype=np.uint8)
 
     def observation(self, state):
-
         # Applies Grayscale
         state = np.transpose(state, (2, 0, 1))
         to_convert = state.copy()
@@ -39,8 +40,6 @@ class ImagePreProcessing(gym.ObservationWrapper):
         # transformation = transforms.Resize(self.resize_shape)
         observation = transformation(converted_state).squeeze(0)
         return observation
-
-
 
 
 def visualise(state, i):
@@ -87,17 +86,53 @@ class ResizeObservation(gym.ObservationWrapper):
 
 env = SkipFrame(env, skip=4)
 env = ImagePreProcessing(env, shape=(120, 160))
-# env = ResizeObservation(env, shape=(120, 160))
 env = FrameStack(env, num_stack=4)
 env.reset()
 
-for i in range(4):
-    state, reward, done, info = env.step(env.action_space.sample())
-    env.render()
-    # print(state.shape)
-    visualise(state, i)
 
-    if done:
-        env.reset()
+#
 
-env.close()
+# 1. Constructing the Neural network
+
+class DoomNN(nn.Module):
+    def __init__(self, input_image, output_image):
+        super().__init__()
+
+        c, h, w = input_image
+
+        self.online = nn.Sequential(
+            nn.Conv2d(c, out_channels=32, kernel_size=(8, 8), stride=(4, 4)),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=(4, 4), stride=(2, 2)),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=(3, 3), stride=(1, 1)),
+            nn.ReLU(),
+            nn.Flatten(),
+            # nn.Linear(3136, 512),
+            # nn.ReLU(),
+            # nn.Linear(512, output_image),
+        )
+
+    def forward(self, x):
+        print(x.vgg16())
+        return x
+
+
+state, reward, done, info = env.step(env.action_space.sample())
+
+model = DoomNN(state.shape, 9999)
+model(state)
+
+# 2. Making the epsilon greedy policy
+# 3. Implementing the Q learning pseudocode
+
+# for i in range(4):
+#     state, reward, done, info = env.step(env.action_space.sample())
+#     env.render()
+#     # print(state.shape)
+#     visualise(state, i)
+#
+#     if done:
+#         env.reset()
+#
+# env.close()
