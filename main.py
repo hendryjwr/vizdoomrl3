@@ -130,11 +130,11 @@ class DoomNN(nn.Module):
 
 class DoomAgent:
 
-    def __init__(self, state_dim, action_dim, save_dir):
+    def __init__(self, state_dim, action_dim):
 
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.save_dir = save_dir
+        # self.save_dir = save_dir
         self.experience = ExperienceReplay()
 
         # Learning Parameters
@@ -143,6 +143,7 @@ class DoomAgent:
         self.current_epsilon = 1
         self.epsilon_rate_decay = 0.99999975
         self.epsilon_rate_min = 0.1
+
         self.learn_every = 4
 
         # Syncing parameters
@@ -153,6 +154,10 @@ class DoomAgent:
 
         # Mario's DNN to predict the most optimal action - we implement this in the Learn section
         self.neural_net = DoomNN(self.state_dim, self.action_dim).float()
+
+        # We
+        self.optimizer = torch.optim.Adam(self.neural_net.parameters(), self.alpha)
+        self.loss_func = torch.nn.SmoothL1Loss()
 
         if torch.cuda.is_available():
             self.neural_net = self.neural_net.to(device="cuda")
@@ -165,14 +170,14 @@ class DoomAgent:
         """
 
         # EXPLORE
-        if np.random.random() < self.current_epsilon_rate:
+        if np.random.random() < self.current_epsilon:
             action_idx = np.random.randint(0, self.action_dim)
 
 
         # EXPLOIT
         else:
             state = state.__array__()
-            state = self.construct_tensor(state)
+            state = construct_tensor(state)
             state = state.unsqueeze(0)
             action_values = self.neural_net(state, model="online")
             action_idx = torch.argmax(action_values, axis=1).item()
@@ -188,15 +193,54 @@ class DoomAgent:
 
     def learn(self):
 
-        # Checks
+        if self.curr_step % self.learn_every != 0:
+            return
+
+        if self.curr_step < 10000:
+            return
 
         # Step 1: Recall from memory
-        batch = self.experience.recall()
+        current_state_array, new_state_array, action_array, reward_array, done_array = self.experience.recall()
 
-        pass
+        # Step 2: Calculate TD estimate based on the online network
+        current_q_values = self.td_estimate(current_state_array, action_array)
 
-    def td_estimate(self,):
-        pass
+        # Step 3: Calculate TD target
+        target_q_values = self.td_target(new_state_array, reward_array, done_array)
+
+        # Step 4: Perform gradient descent
+        self.update(current_q_values, target_q_values)
+
+        # Step 5: Sync online network with target network
+
+        if self.curr_step % self.syncing_frequency == 0:
+            self.neural_net.target.load_state_dict(self.neural_net.online.state_dict())
+
+    def td_estimate(self, current_state_array, action_array):
+        indexing_array = np.arange(0, mini_batch_size)
+        current_q_values = self.neural_net(current_state_array, "online")[indexing_array, action_array]
+        return current_q_values
+
+    def td_target(self, next_state, reward, done):
+        if done:
+            return reward
+
+        future_q_values = self.neural_net(next_state, "online")
+        best_action_array = torch.argmax(future_q_values, axis=1)
+
+        indexing_array = np.arange(0, mini_batch_size)
+        target_q_values = self.neural_net(next_state, "target")[indexing_array, best_action_array]
+
+        return (reward + self.gamma * target_q_values).to(torch.float32)
+
+    def update(self, current_q_values, target_q_values):
+
+        # Here parameter = neural network weights
+        loss = self.loss_func(current_q_values, target_q_values)
+        loss.backwards()
+        self.optimizer.step()
+        self.optimizer.zero_grad()
+        print(loss.item())
 
 
 class ExperienceReplay:
@@ -204,16 +248,16 @@ class ExperienceReplay:
         self.memory = deque(maxlen=100000)  # We leave this value at 100k for now
 
     def construct_tensor(self, value):
+
         if self.cuda:
-            value = torch.tensor(value).cuda()
-            return value
+            return torch.tensor(value).cuda()
         else:
             return torch.tensor(value)
 
     def cache(self, current_state, new_state, action, reward, done):
 
-        current_state = construct_tensor(current_state)
-        new_state = construct_tensor(new_state)
+        current_state = construct_tensor(current_state.__array__())
+        new_state = construct_tensor(new_state.__array__())
         action = construct_tensor([action])
         reward = construct_tensor([reward])
         done = construct_tensor([done])
@@ -229,32 +273,32 @@ class ExperienceReplay:
         return state, next_state, action.squeeze(), reward.squeeze(), done.squeeze()
 
 
-state, reward, done, info = env.step(env.action_space.sample())
-DoomAgent(env.observation_space.shape, env.action_space.n, 423432)
-test = DoomNN(state.shape, 7)
-
-print(test.forward([1, 2], test))
-
 # summary(DoomNN((4, 120, 160), env.action_space.n), (4, 120, 160))
 
 # 2. Making the epsilon greedy policy
 # 3. Implementing the Q learning pseudocode
 
-ddqn_agent = DoomAgent()
+ddqn_agent = DoomAgent(env.observation_space.shape, env.action_space.n)
 experience = ExperienceReplay()
 
 
 def play():
-    episodes = 10
+    episodes = 1000000000000000000000000000000000
     for i in range(episodes):
 
-        state, reward, done, info = env.reset()
+        state = env.reset()
+        done = False
 
         while not done:
+            if ddqn_agent.curr_step % 1000 == 0:
+                print(ddqn_agent.curr_step)
 
             action = ddqn_agent.act(state)
             new_state, reward, done, info = env.step(action)
             experience.cache(state, new_state, action, reward, done)
+            ddqn_agent.learn()
+            ddqn_agent.curr_step += 1
+            state = new_state
 
             # Step 1 Calculate td_estimate
             # Step 2 Calculate td_target
@@ -263,16 +307,13 @@ def play():
             # Step 5 Sync online and target networks
             # Step 6 make new state, old state
 
-            env.render()
-            # print(state.shape)
             visualise(state, i)
 
             if done:
-                env.reset()
+                break
 
-        env.close()
 
-    pass
+play()
 
 # TD estimate as was done in Mario
 # current_Q = self.net(state, model="online")[np.arange(0, self.batch_size), action]
