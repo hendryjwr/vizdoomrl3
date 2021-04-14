@@ -135,6 +135,7 @@ class DoomAgent:
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.save_dir = save_dir
+        self.experience = ExperienceReplay()
 
         # Learning Parameters
         self.gamma = 0.99
@@ -142,6 +143,7 @@ class DoomAgent:
         self.current_epsilon = 1
         self.epsilon_rate_decay = 0.99999975
         self.epsilon_rate_min = 0.1
+        self.learn_every = 4
 
         # Syncing parameters
         self.syncing_frequency = 10000
@@ -185,13 +187,21 @@ class DoomAgent:
         return action_idx
 
     def learn(self):
+
+        # Checks
+
+        # Step 1: Recall from memory
+        batch = self.experience.recall()
+
+        pass
+
+    def td_estimate(self,):
         pass
 
 
 class ExperienceReplay:
     def __init__(self):
         self.memory = deque(maxlen=100000)  # We leave this value at 100k for now
-        self.update_memory_every = 4
 
     def construct_tensor(self, value):
         if self.cuda:
@@ -200,17 +210,15 @@ class ExperienceReplay:
         else:
             return torch.tensor(value)
 
-    def cache(self, current_state, experience):
-
-        new_state, reward, done, info = experience
+    def cache(self, current_state, new_state, action, reward, done):
 
         current_state = construct_tensor(current_state)
         new_state = construct_tensor(new_state)
+        action = construct_tensor([action])
         reward = construct_tensor([reward])
         done = construct_tensor([done])
-        info = construct_tensor([info])
 
-        self.memory.append((current_state, new_state, reward, done, info))
+        self.memory.append((current_state, new_state, action, reward, done))
 
     def recall(self):
 
@@ -224,21 +232,51 @@ class ExperienceReplay:
 state, reward, done, info = env.step(env.action_space.sample())
 DoomAgent(env.observation_space.shape, env.action_space.n, 423432)
 test = DoomNN(state.shape, 7)
-test2 = test.online
-print('before', test2)
-print(np.asarray(test2))
+
+print(test.forward([1, 2], test))
+
 # summary(DoomNN((4, 120, 160), env.action_space.n), (4, 120, 160))
 
 # 2. Making the epsilon greedy policy
 # 3. Implementing the Q learning pseudocode
 
-# for i in range(4):
-#     state, reward, done, info = env.step(env.action_space.sample())
-#     env.render()
-#     # print(state.shape)
-#     visualise(state, i)
-#
-#     if done:
-#         env.reset()
-#
-# env.close()
+ddqn_agent = DoomAgent()
+experience = ExperienceReplay()
+
+
+def play():
+    episodes = 10
+    for i in range(episodes):
+
+        state, reward, done, info = env.reset()
+
+        while not done:
+
+            action = ddqn_agent.act(state)
+            new_state, reward, done, info = env.step(action)
+            experience.cache(state, new_state, action, reward, done)
+
+            # Step 1 Calculate td_estimate
+            # Step 2 Calculate td_target
+            # Step 3 Calculate loss
+            # Step 4 Backward propagation
+            # Step 5 Sync online and target networks
+            # Step 6 make new state, old state
+
+            env.render()
+            # print(state.shape)
+            visualise(state, i)
+
+            if done:
+                env.reset()
+
+        env.close()
+
+    pass
+
+# TD estimate as was done in Mario
+# current_Q = self.net(state, model="online")[np.arange(0, self.batch_size), action]
+# TD estimate rewritten
+# current_Q = [0] * 32
+# for index, element in enumerate(states):
+# current_Q[index] = self.net(element, model="online")[action[index]]
