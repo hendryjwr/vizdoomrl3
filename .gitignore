@@ -111,3 +111,5 @@ _vizdoom.ini
 /vizdoomgym/
 
 /test_images/
+
+/checkpoints/
