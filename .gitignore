@@ -109,3 +109,5 @@ lib64
 _vizdoom.ini
 
 /vizdoomgym/
+
+/test_images/
