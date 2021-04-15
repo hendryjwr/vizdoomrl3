@@ -86,7 +86,7 @@ class ResizeObservation(gym.ObservationWrapper):
 
 
 env = SkipFrame(env, skip=4)
-env = ImagePreProcessing(env, shape=(120, 160))
+env = ImagePreProcessing(env, shape=(90, 120))
 env = FrameStack(env, num_stack=4)
 
 env.reset()
