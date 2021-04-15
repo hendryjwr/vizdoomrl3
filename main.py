@@ -115,7 +115,7 @@ class DoomNN(nn.Module):
             nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(11264, 512),
+            nn.Linear(4928, 512),
             nn.ReLU(),
             nn.Linear(512, output_dim),
         )
