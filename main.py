@@ -13,7 +13,7 @@ import gym
 from gym.spaces import Box
 from gym.wrappers import FrameStack
 
-mini_batch_size = 32
+mini_batch_size = 16
 
 env = gym.make('VizdoomCorridor-v0')
 
@@ -235,12 +235,13 @@ class DoomAgent:
         loss.backward()
         self.optimizer.step()
         self.optimizer.zero_grad()
-        print(loss.item())
+        if self.curr_step % 100 == 0:
+            print(loss.item())
 
 
 class ExperienceReplay:
     def __init__(self):
-        self.memory = deque(maxlen=100000)  # We leave this value at 100k for now
+        self.memory = deque(maxlen=50000)  # We leave this value at 100k for now
 
     def construct_tensor(self, value):
 

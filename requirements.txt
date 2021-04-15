@@ -1,0 +1,24 @@
+appdirs==1.4.4
+cfgv==3.2.0
+cloudpickle==1.6.0
+distlib==0.3.1
+filelock==3.0.12
+future==0.18.2
+gym==0.18.0
+identify==2.2.2
+nodeenv==1.5.0
+numpy==1.20.2
+Pillow==7.2.0
+pre-commit==2.11.1
+pyglet==1.5.11
+PyYAML==5.4.1
+scipy==1.6.2
+six==1.15.0
+toml==0.10.2
+torch==1.8.1
+torchsummary==1.5.1
+torchvision==0.9.1
+typing-extensions==3.7.4.3
+virtualenv==20.4.3
+vizdoom==1.1.8
+-e git+https://github.com/hendryjwr/vizdoomrl3.git@238cf608c57242f1558f7d3776873712ec25b3d0#egg=vizdoomgym
