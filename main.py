@@ -13,6 +13,7 @@ import gym
 from gym.spaces import Box
 from gym.wrappers import FrameStack
 import matplotlib.pyplot as plt
+from cpprb import ReplayBuffer
 
 mini_batch_size = 32
 
@@ -25,10 +26,14 @@ if device.type == 'cuda':
     print(torch.cuda.is_available())
     print(torch.cuda.get_device_name(0))
     print('Memory Usage:')
-    print('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,1), 'GB')
-    print('Cached:   ', round(torch.cuda.memory_reserved(0)/1024**3,1), 'GB')
+    print('Allocated:', round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1), 'GB')
+    print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
 
 env = gym.make('VizdoomCorridor-v0')
+
+buffer_size = 50000
+act_dim = 1
+obs_shape = (4, 84, 84)  # This changes based on the environment
 
 
 class ImagePreProcessing(gym.ObservationWrapper):
@@ -206,17 +211,19 @@ class DoomAgent:
     def learn(self):
         if self.curr_step % self.learn_every != 0:
             return None, None
-        if self.curr_step < 10000:
+        if self.curr_step < 33: # put this back to 10000
             return None, None
 
         # Step 1: Recall from memory
-        current_state_array, new_state_array, action_array, reward_array, done_array = experience.recall()
+
+        # current_state_array, new_state_array, action_array, reward_array, done_array = experience.recall()
+        current_state_array, new_state_array, action_array, reward_array, done_array = memory_buffer.recall()
 
         # Step 2: Calculate TD estimate based on the online network
         current_q_values = self.td_estimate(current_state_array, action_array)
 
         # Step 3: Calculate TD target
-        target_q_values = self.td_target(new_state_array, reward_array, done_array)        
+        target_q_values = self.td_target(new_state_array, reward_array, done_array)
 
         # Step 4: Perform gradient descent
         loss_value = self.update(current_q_values, target_q_values)
@@ -230,6 +237,7 @@ class DoomAgent:
 
     def td_estimate(self, current_state_array, action_array):
         indexing_array = np.arange(0, mini_batch_size)
+        action_array = torch.as_tensor(action_array, dtype=torch.long)  # Fixes annoying bug no clue why it works
         current_q_values = self.neural_net(current_state_array, "online")[indexing_array, action_array]
         return current_q_values
 
@@ -257,33 +265,60 @@ class ExperienceReplay:
     def __init__(self):
         self.memory = deque(maxlen=30000)  # We leave this value at 100k for now
 
-    def construct_tensor(self, value):
-
-        if self.cuda:
-            return torch.tensor(value).cuda()
-        else:
-            return torch.tensor(value)
-
     def cache(self, current_state, new_state, action, reward, done):
-
         current_state = construct_tensor(current_state.__array__())
         new_state = construct_tensor(new_state.__array__())
         action = construct_tensor([action])
         reward = construct_tensor([reward])
         done = construct_tensor([done])
-
         self.memory.append((current_state, new_state, action, reward, done))
 
     def recall(self):
-
         # 100% to change later
         batch = random.sample(self.memory, mini_batch_size)
         state, next_state, action, reward, done = map(torch.stack, zip(*batch))
+        # print('from local')
+        # print(state.shape)
+        # print(next_state.shape)
+        # print(action.shape)
+        # print(reward.shape)
+        # print(done.shape)
 
         return state, next_state, action.squeeze(), reward.squeeze(), done.squeeze()
 
 
-# The following class is taken from https://github.com/yuansongFeng/MadMario/ for metric logging of data. 
+class ReplayBufferContainer:
+    def __init__(self):
+        self.replay_buffer = ReplayBuffer(buffer_size,
+                                          env_dict={"obs": {"shape": obs_shape},
+                                                    "act": {"shape": act_dim},
+                                                    "rew": {},
+                                                    "next_obs": {"shape": obs_shape},
+                                                    "done": {}})
+
+    def cache(self, current_state, new_state, action, reward, done):
+        self.replay_buffer.add(obs=current_state, act=action, rew=reward, next_obs=new_state, done=done)
+
+    def recall(self):
+        sample = self.replay_buffer.sample(mini_batch_size)
+        current_state,  action, reward,   new_state,  done = sample
+        current_state = construct_tensor(sample[current_state])
+        new_state = construct_tensor(sample[new_state])
+        action = construct_tensor(sample[action])
+        reward = construct_tensor(sample[reward])
+        done = construct_tensor(sample[done])
+        # print('from import')
+        # print(current_state.shape)
+        # print(new_state.shape)
+        # print(action.shape)
+        # print(reward.shape)
+        # print(done.shape)
+        return current_state, new_state, action.squeeze(), reward.squeeze(), done.squeeze()
+
+
+
+
+# The following class is taken from https://github.com/yuansongFeng/MadMario/ for metric logging of data.
 class MetricLogger:
     def __init__(self, save_dir):
         self.save_log = save_dir / "log"
@@ -396,9 +431,9 @@ save_dir = Path("checkpoints") / datetime.datetime.now().strftime("%Y-%m-%dT%H-%
 save_dir.mkdir(parents=True)
 
 ddqn_agent = DoomAgent(env.observation_space.shape, env.action_space.n)
-logger= MetricLogger(save_dir)
+logger = MetricLogger(save_dir)
 experience = ExperienceReplay()
-
+memory_buffer = ReplayBufferContainer()
 
 
 def play():
@@ -412,7 +447,9 @@ def play():
 
             action = ddqn_agent.act(state)
             new_state, reward, done, info = env.step(action)
-            experience.cache(state, new_state, action, reward, done)
+            # experience.cache(state, new_state, action, reward, done)
+            memory_buffer.cache(state, new_state, action, reward, done)
+
             q, loss = ddqn_agent.learn()
             logger.log_step(reward, loss, q)
             state = new_state
@@ -427,6 +464,7 @@ def play():
             # visualise(state, i)
 
             if done:
+                memory_buffer.replay_buffer.on_episode_end()
                 break
 
         logger.log_episode()
