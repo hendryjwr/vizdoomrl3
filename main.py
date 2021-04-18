@@ -26,7 +26,9 @@ if device.type == 'cuda':
     print(torch.cuda.get_device_name(0))
     print('Memory Usage:')
     print('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,1), 'GB')
+    print('Max Allocated:', round(torch.cuda.max_memory_allocated(0)/1024**3,1), 'GB')
     print('Cached:   ', round(torch.cuda.memory_reserved(0)/1024**3,1), 'GB')
+    print('Max Cached:   ', round(torch.cuda.max_memory_reserved(0)/1024**3,1), 'GB')
 
 env = gym.make('VizdoomCorridor-v0')
 
@@ -108,7 +110,7 @@ env.reset()
 #
 def construct_tensor(value):
     if torch.cuda.is_available():
-        value = torch.tensor(value).cuda()
+        value = torch.tensor(value, device=torch.device('cuda:0'))
         return value
     else:
         return torch.tensor(value)
@@ -255,7 +257,7 @@ class DoomAgent:
 
 class ExperienceReplay:
     def __init__(self):
-        self.memory = deque(maxlen=30000)  # We leave this value at 100k for now
+        self.memory = deque(maxlen=60000)  # We leave this value at 100k for now
 
     def construct_tensor(self, value):
 
@@ -402,7 +404,7 @@ experience = ExperienceReplay()
 
 
 def play():
-    episodes = 50000
+    episodes = 500000
     for i in range(episodes):
 
         state = env.reset()
