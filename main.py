@@ -150,7 +150,7 @@ class DoomAgent:
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.save_dir = save_dir
-        self.save_every = 1000
+        self.save_every = 200000
 
         # Learning Parameters
         self.gamma = 0.99
