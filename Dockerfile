@@ -3,7 +3,7 @@ FROM nvidia/cuda:10.2-base-ubuntu18.04
 ENV DEBIAN_FRONTEND=noninteractive 
 
 
-RUN apt-get update && apt-get install -y make build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev apt-utils liblzma-dev
+RUN apt-get update && apt-get install -y make build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev apt-utils liblzma-dev vim
 
 RUN wget https://www.python.org/ftp/python/3.7.9/Python-3.7.9.tgz && tar xzvf Python-3.7.9.tgz && cd Python-3.7.9 && ./configure && make && make install 
 
@@ -29,3 +29,4 @@ RUN cd vizdoomgym && pip3 install -e .
 
 RUN pip3 install -r requirements.txt
 
+RUN pip3 install torch==1.8.1+cu111 torchvision==0.9.1+cu111 torchaudio==0.8.1 -f https://download.pytorch.org/whl/torch_stable.html
