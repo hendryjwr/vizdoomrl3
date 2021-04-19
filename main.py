@@ -150,7 +150,7 @@ class DoomAgent:
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.save_dir = save_dir
-        self.save_every = 200000
+        self.save_every = 1000
 
         # Learning Parameters
         self.gamma = 0.99
@@ -207,12 +207,16 @@ class DoomAgent:
         return action_idx
 
     def learn(self):
+        
+        if self.curr_step % self.syncing_frequency == 0:
+            self.neural_net.target.load_state_dict(self.neural_net.online.state_dict())
+        if self.curr_step % self.save_every == 0:
+            self.save()
         if self.curr_step % self.learn_every != 0:
             return None, None
         if self.curr_step < 10000:
             return None, None
-        if self.curr_step % self.save_every == 0:
-            self.save()
+        
 
         # Step 1: Recall from memory
         current_state_array, new_state_array, action_array, reward_array, done_array = experience.recall()
@@ -227,9 +231,6 @@ class DoomAgent:
         loss_value = self.update(current_q_values, target_q_values)
 
         # Step 5: Sync online network with target network
-
-        if self.curr_step % self.syncing_frequency == 0:
-            self.neural_net.target.load_state_dict(self.neural_net.online.state_dict())
 
         return (current_q_values.mean().item(), loss_value)
 
