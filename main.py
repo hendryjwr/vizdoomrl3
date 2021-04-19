@@ -261,7 +261,7 @@ class DoomAgent:
     # Save function from https://github.com/yuansongFeng/MadMario/ to work alongsite logging features.
     def save(self):
         save_path = (
-            self.save_dir / f"doom_net_{int(self.curr_step // self.save_every)}.chkpt"
+            self.save_dir / f"doom_net_{int(self.curr_step // self.save_every)}.pt"
         )
         torch.save(
             dict(model=self.neural_net.state_dict(), exploration_rate=self.current_epsilon),
