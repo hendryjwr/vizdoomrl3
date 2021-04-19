@@ -145,11 +145,12 @@ class DoomNN(nn.Module):
 
 class DoomAgent:
 
-    def __init__(self, state_dim, action_dim):
+    def __init__(self, state_dim, action_dim, save_dir):
 
         self.state_dim = state_dim
         self.action_dim = action_dim
-        # self.save_dir = save_dir
+        self.save_dir = save_dir
+        self.save_every = 200000
 
         # Learning Parameters
         self.gamma = 0.99
@@ -210,6 +211,8 @@ class DoomAgent:
             return None, None
         if self.curr_step < 10000:
             return None, None
+        if self.curr_step % self.save_every == 0:
+            self.save()
 
         # Step 1: Recall from memory
         current_state_array, new_state_array, action_array, reward_array, done_array = experience.recall()
@@ -253,6 +256,16 @@ class DoomAgent:
         self.optimizer.step()
         self.optimizer.zero_grad()
         return loss.item()
+
+    # Save function from https://github.com/yuansongFeng/MadMario/ to work alongsite logging features.
+    def save(self):
+        save_path = (
+            self.save_dir / f"doom_net_{int(self.curr_step // self.save_every)}.chkpt"
+        )
+        torch.save(
+            dict(model=self.neural_net.state_dict(), exploration_rate=self.current_epsilon),
+            save_path,
+        )
 
 
 class ExperienceReplay:
@@ -397,7 +410,7 @@ class MetricLogger:
 save_dir = Path("checkpoints") / datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 save_dir.mkdir(parents=True)
 
-ddqn_agent = DoomAgent(env.observation_space.shape, env.action_space.n)
+ddqn_agent = DoomAgent(env.observation_space.shape, env.action_space.n, save_dir=save_dir)
 logger= MetricLogger(save_dir)
 experience = ExperienceReplay()
 
@@ -405,7 +418,7 @@ experience = ExperienceReplay()
 
 def play():
 
-    episodes = 200000
+    episodes = 300000
 
     for i in range(episodes):
 
