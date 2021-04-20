@@ -51,9 +51,9 @@ class ImagePreProcessing(gym.ObservationWrapper):
 
         # Applies resizing
 
-        # transformation = transforms.Compose([transforms.Resize(self.resize_shape), transforms.Normalize(0, 255)])
+        transformation = transforms.Compose([transforms.Resize(self.resize_shape), transforms.Normalize(0, 255)])
         # Uncomment this is for visualization
-        transformation = transforms.Resize(self.resize_shape)
+        # transformation = transforms.Resize(self.resize_shape)
         observation = transformation(converted_state).squeeze(0)
         return observation
 
