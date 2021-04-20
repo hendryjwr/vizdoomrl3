@@ -154,9 +154,9 @@ class DoomAgent:
 
         # Learning Parameters
         self.gamma = 0.99
-        self.alpha = 0.00001  # 0.00025
+        self.alpha = 0.00025  # 0.00025
         self.current_epsilon = 1
-        self.epsilon_rate_decay = 0.9999975
+        self.epsilon_rate_decay = 0.99999975
         self.epsilon_rate_min = 0.1
 
         self.learn_every = 3
@@ -410,6 +410,7 @@ class MetricLogger:
 save_dir = Path("checkpoints") / "medic" /datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 save_dir.mkdir(parents=True)
 
+print(env.action_space.n)
 ddqn_agent = DoomAgent(env.observation_space.shape, env.action_space.n, save_dir=save_dir)
 logger = MetricLogger(save_dir)
 experience = ExperienceReplay()
