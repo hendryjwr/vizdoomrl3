@@ -407,7 +407,7 @@ class MetricLogger:
 # 3. Implementing the Q learning pseudocode
 
 
-save_dir = Path("checkpoints") / datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S") + "medic"
+save_dir = Path("checkpoints") / "medic" /datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 save_dir.mkdir(parents=True)
 
 ddqn_agent = DoomAgent(env.observation_space.shape, env.action_space.n, save_dir=save_dir)
@@ -425,7 +425,6 @@ def play():
 
         while not done:
 
-            env.render()
             action = ddqn_agent.act(state)
             new_state, reward, done, info = env.step(action)
             experience.cache(state, new_state, action, reward, done)
