@@ -30,7 +30,7 @@ if device.type == 'cuda':
     print('Cached:   ', round(torch.cuda.memory_reserved(0)/1024**3,1), 'GB')
     print('Max Cached:   ', round(torch.cuda.max_memory_reserved(0)/1024**3,1), 'GB')
 
-env = gym.make('VizdoomCorridor-v0')
+env = gym.make('VizdoomHealthGathering-v0')
 
 
 class ImagePreProcessing(gym.ObservationWrapper):
@@ -91,11 +91,11 @@ class ResizeObservation(gym.ObservationWrapper):
         self.observation_space = Box(low=0, high=255, shape=self.shape, dtype=np.uint8)
 
     def observation(self, observation):
-        transformation = transforms.Compose(
-            [transforms.Resize(self.shape), transforms.Normalize(0, 255)]
-        )
+        # transformation = transforms.Compose(
+        #     [transforms.Resize(self.shape), transforms.Normalize(0, 255)]
+        # )
         # Uncomment this is for visualization
-        # transformation = transforms.Resize(self.shape)
+        transformation = transforms.Resize(self.shape)
         observation = transformation(observation).squeeze(0)
         return observation
 
@@ -419,15 +419,18 @@ experience = ExperienceReplay()
 
 def play():
 
-    episodes = 300000
+    episodes = 1
 
     for i in range(episodes):
 
         state = env.reset()
         done = False
+        steps = 0
 
         while not done:
 
+            time.sleep(0.1)
+            env.render()
             action = ddqn_agent.act(state)
             new_state, reward, done, info = env.step(action)
             experience.cache(state, new_state, action, reward, done)
@@ -442,7 +445,9 @@ def play():
             # Step 5 Sync online and target networks
             # Step 6 make new state, old state
 
-            # visualise(state, i)
+            if steps == 0:
+                visualise(state, i)
+            steps += 1
 
             if done:
                 break
