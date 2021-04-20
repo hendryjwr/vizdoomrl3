@@ -270,7 +270,7 @@ class DoomAgent:
 
 class ExperienceReplay:
     def __init__(self):
-        self.memory = deque(maxlen=10000)  # We leave this value at 100k for now
+        self.memory = deque(maxlen=30000)  # We leave this value at 100k for now
 
     def construct_tensor(self, value):
 
