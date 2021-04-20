@@ -14,7 +14,7 @@ from gym.spaces import Box
 from gym.wrappers import FrameStack
 import matplotlib.pyplot as plt
 
-mini_batch_size = 32
+mini_batch_size = 64
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Using device:', device)
@@ -25,10 +25,10 @@ if device.type == 'cuda':
     print(torch.cuda.is_available())
     print(torch.cuda.get_device_name(0))
     print('Memory Usage:')
-    print('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,1), 'GB')
-    print('Max Allocated:', round(torch.cuda.max_memory_allocated(0)/1024**3,1), 'GB')
-    print('Cached:   ', round(torch.cuda.memory_reserved(0)/1024**3,1), 'GB')
-    print('Max Cached:   ', round(torch.cuda.max_memory_reserved(0)/1024**3,1), 'GB')
+    print('Allocated:', round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1), 'GB')
+    print('Max Allocated:', round(torch.cuda.max_memory_allocated(0) / 1024 ** 3, 1), 'GB')
+    print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
+    print('Max Cached:   ', round(torch.cuda.max_memory_reserved(0) / 1024 ** 3, 1), 'GB')
 
 env = gym.make('VizdoomHealthGathering-v0')
 
@@ -51,9 +51,9 @@ class ImagePreProcessing(gym.ObservationWrapper):
 
         # Applies resizing
 
-        transformation = transforms.Compose([transforms.Resize(self.resize_shape), transforms.Normalize(0, 255)])
+        # transformation = transforms.Compose([transforms.Resize(self.resize_shape), transforms.Normalize(0, 255)])
         # Uncomment this is for visualization
-        # transformation = transforms.Resize(self.resize_shape)
+        transformation = transforms.Resize(self.resize_shape)
         observation = transformation(converted_state).squeeze(0)
         return observation
 
@@ -101,7 +101,7 @@ class ResizeObservation(gym.ObservationWrapper):
 
 
 env = SkipFrame(env, skip=4)
-env = ImagePreProcessing(env, shape=(90, 120))
+env = ImagePreProcessing(env, shape=(60, 80))
 env = FrameStack(env, num_stack=4)
 
 env.reset()
@@ -130,7 +130,7 @@ class DoomNN(nn.Module):
             nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(4928, 512),
+            nn.Linear(1536, 512),
             nn.ReLU(),
             nn.Linear(512, output_dim),
         )
@@ -154,9 +154,9 @@ class DoomAgent:
 
         # Learning Parameters
         self.gamma = 0.99
-        self.alpha = 0.00025
+        self.alpha = 0.00001  # 0.00025
         self.current_epsilon = 1
-        self.epsilon_rate_decay = 0.99999975
+        self.epsilon_rate_decay = 0.9999975
         self.epsilon_rate_min = 0.1
 
         self.learn_every = 3
@@ -207,7 +207,7 @@ class DoomAgent:
         return action_idx
 
     def learn(self):
-        
+
         if self.curr_step % self.syncing_frequency == 0:
             self.neural_net.target.load_state_dict(self.neural_net.online.state_dict())
         if self.curr_step % self.save_every == 0:
@@ -216,7 +216,6 @@ class DoomAgent:
             return None, None
         if self.curr_step < 10000:
             return None, None
-        
 
         # Step 1: Recall from memory
         current_state_array, new_state_array, action_array, reward_array, done_array = experience.recall()
@@ -225,7 +224,7 @@ class DoomAgent:
         current_q_values = self.td_estimate(current_state_array, action_array)
 
         # Step 3: Calculate TD target
-        target_q_values = self.td_target(new_state_array, reward_array, done_array)        
+        target_q_values = self.td_target(new_state_array, reward_array, done_array)
 
         # Step 4: Perform gradient descent
         loss_value = self.update(current_q_values, target_q_values)
@@ -261,7 +260,7 @@ class DoomAgent:
     # Save function from https://github.com/yuansongFeng/MadMario/ to work alongsite logging features.
     def save(self):
         save_path = (
-            self.save_dir / f"doom_net_{int(self.curr_step // self.save_every)}.pt"
+                self.save_dir / f"doom_net_{int(self.curr_step // self.save_every)}.pt"
         )
         torch.save(
             dict(model=self.neural_net.state_dict(), exploration_rate=self.current_epsilon),
@@ -271,7 +270,7 @@ class DoomAgent:
 
 class ExperienceReplay:
     def __init__(self):
-        self.memory = deque(maxlen=60000)  # We leave this value at 100k for now
+        self.memory = deque(maxlen=10000)  # We leave this value at 100k for now
 
     def construct_tensor(self, value):
 
@@ -412,31 +411,26 @@ save_dir = Path("checkpoints") / datetime.datetime.now().strftime("%Y-%m-%dT%H-%
 save_dir.mkdir(parents=True)
 
 ddqn_agent = DoomAgent(env.observation_space.shape, env.action_space.n, save_dir=save_dir)
-logger= MetricLogger(save_dir)
+logger = MetricLogger(save_dir)
 experience = ExperienceReplay()
 
 
-
 def play():
-
-    episodes = 1
+    episodes = 300000
 
     for i in range(episodes):
 
         state = env.reset()
         done = False
-        steps = 0
 
         while not done:
 
-            time.sleep(0.1)
             env.render()
             action = ddqn_agent.act(state)
             new_state, reward, done, info = env.step(action)
             experience.cache(state, new_state, action, reward, done)
             q, loss = ddqn_agent.learn()
             logger.log_step(reward, loss, q)
-            state = new_state
 
             # Step 1 Calculate td_estimate
             # Step 2 Calculate td_target
@@ -445,9 +439,7 @@ def play():
             # Step 5 Sync online and target networks
             # Step 6 make new state, old state
 
-            if steps == 0:
-                visualise(state, i)
-            steps += 1
+            state = new_state
 
             if done:
                 break
