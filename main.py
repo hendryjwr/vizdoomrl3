@@ -81,25 +81,6 @@ class SkipFrame(gym.Wrapper):
         return new_state, reward_sum, done, info
 
 
-class ResizeObservation(gym.ObservationWrapper):
-    def __init__(self, env, shape):
-        super().__init__(env)
-        self.shape = shape
-        # print('before', self.observation_space.shape, self.shape)
-        # obs_shape = self.shape + self.observation_space.shape[2:]
-        # print('after', obs_shape)
-        self.observation_space = Box(low=0, high=255, shape=self.shape, dtype=np.uint8)
-
-    def observation(self, observation):
-        transformation = transforms.Compose(
-            [transforms.Resize(self.shape), transforms.Normalize(0, 255)]
-        )
-        # Uncomment this is for visualization
-        # transformation = transforms.Resize(self.shape)
-        observation = transformation(observation).squeeze(0)
-        return observation
-
-
 env = SkipFrame(env, skip=4)
 env = ImagePreProcessing(env, shape=(60, 80))
 env = FrameStack(env, num_stack=4)
