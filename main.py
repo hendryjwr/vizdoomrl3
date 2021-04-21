@@ -91,11 +91,11 @@ class ResizeObservation(gym.ObservationWrapper):
         self.observation_space = Box(low=0, high=255, shape=self.shape, dtype=np.uint8)
 
     def observation(self, observation):
-        # transformation = transforms.Compose(
-        #     [transforms.Resize(self.shape), transforms.Normalize(0, 255)]
-        # )
+        transformation = transforms.Compose(
+            [transforms.Resize(self.shape), transforms.Normalize(0, 255)]
+        )
         # Uncomment this is for visualization
-        transformation = transforms.Resize(self.shape)
+        # transformation = transforms.Resize(self.shape)
         observation = transformation(observation).squeeze(0)
         return observation
 
