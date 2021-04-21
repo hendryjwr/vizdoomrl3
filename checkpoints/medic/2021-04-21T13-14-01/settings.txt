@@ -1,0 +1,1 @@
+running on nitt. 90x120 image size, 64 batch size, decaying over 2m steps. Remember to change settings for visualise.py when running checking progress for this.
