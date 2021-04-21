@@ -191,7 +191,7 @@ class DoomAgent:
         self.neural_net.load_state_dict(state_dict)
         self.current_epsilon = current_epsilon
 
-checkpoint = Path('checkpoints/medic/2021-04-20T15-36-59/doom_net_6.pt')
+checkpoint = Path('checkpoints/medic/2021-04-20T20-12-38/doom_net_5.pt')
 ddqn_agent = DoomAgent(env.observation_space.shape, env.action_space.n, checkpoint=checkpoint)
 
 def vis():
