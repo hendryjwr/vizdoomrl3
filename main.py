@@ -91,11 +91,11 @@ class ResizeObservation(gym.ObservationWrapper):
         self.observation_space = Box(low=0, high=255, shape=self.shape, dtype=np.uint8)
 
     def observation(self, observation):
-        # transformation = transforms.Compose(
-        #     [transforms.Resize(self.shape), transforms.Normalize(0, 255)]
-        # )
+        transformation = transforms.Compose(
+            [transforms.Resize(self.shape), transforms.Normalize(0, 255)]
+        )
         # Uncomment this is for visualization
-        transformation = transforms.Resize(self.shape)
+        # transformation = transforms.Resize(self.shape)
         observation = transformation(observation).squeeze(0)
         return observation
 
@@ -410,7 +410,6 @@ class MetricLogger:
 save_dir = Path("checkpoints") / "medic" /datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 save_dir.mkdir(parents=True)
 
-print(env.action_space.n)
 ddqn_agent = DoomAgent(env.observation_space.shape, env.action_space.n, save_dir=save_dir)
 logger = MetricLogger(save_dir)
 experience = ExperienceReplay()
