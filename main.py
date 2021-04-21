@@ -3,7 +3,6 @@ from torch import nn
 from torchvision import transforms
 from PIL import Image
 import numpy as np
-import vizdoomgym
 from pathlib import Path
 from collections import deque
 import random, datetime, os, copy, time
@@ -13,8 +12,9 @@ import gym
 from gym.spaces import Box
 from gym.wrappers import FrameStack
 import matplotlib.pyplot as plt
+import vizdoomgym
 
-mini_batch_size = 64
+mini_batch_size = 32
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Using device:', device)
@@ -30,8 +30,7 @@ if device.type == 'cuda':
     print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
     print('Max Cached:   ', round(torch.cuda.max_memory_reserved(0) / 1024 ** 3, 1), 'GB')
 
-env = gym.make('VizdoomHealthGathering-v0')
-
+env = gym.make('VizdoomCorridor-v0')
 
 class ImagePreProcessing(gym.ObservationWrapper):
 
@@ -81,8 +80,27 @@ class SkipFrame(gym.Wrapper):
         return new_state, reward_sum, done, info
 
 
+class ResizeObservation(gym.ObservationWrapper):
+    def __init__(self, env, shape):
+        super().__init__(env)
+        self.shape = shape
+        # print('before', self.observation_space.shape, self.shape)
+        # obs_shape = self.shape + self.observation_space.shape[2:]
+        # print('after', obs_shape)
+        self.observation_space = Box(low=0, high=255, shape=self.shape, dtype=np.uint8)
+
+    def observation(self, observation):
+        # transformation = transforms.Compose(
+        #     [transforms.Resize(self.shape), transforms.Normalize(0, 255)]
+        # )
+        # Uncomment this is for visualization
+        transformation = transforms.Resize(self.shape)
+        observation = transformation(observation).squeeze(0)
+        return observation
+
+
 env = SkipFrame(env, skip=4)
-env = ImagePreProcessing(env, shape=(60, 80))
+env = ImagePreProcessing(env, shape=(90, 120))
 env = FrameStack(env, num_stack=4)
 
 env.reset()
@@ -251,7 +269,7 @@ class DoomAgent:
 
 class ExperienceReplay:
     def __init__(self):
-        self.memory = deque(maxlen=30000)  # We leave this value at 100k for now
+        self.memory = deque(maxlen=50000)  # We leave this value at 100k for now
 
     def construct_tensor(self, value):
 
@@ -391,6 +409,7 @@ class MetricLogger:
 save_dir = Path("checkpoints") / "medic" /datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 save_dir.mkdir(parents=True)
 
+print(env.action_space.n)
 ddqn_agent = DoomAgent(env.observation_space.shape, env.action_space.n, save_dir=save_dir)
 logger = MetricLogger(save_dir)
 experience = ExperienceReplay()
@@ -402,13 +421,21 @@ def play():
     for i in range(episodes):
 
         state = env.reset()
+        variables_cur = {'kills' : env.get_kill_count(), 'health' : env.get_health(), 
+            'ammo' : env.get_ammo()}
+        variables_prev = variables_cur.copy()
         done = False
 
         while not done:
-
+            
             action = ddqn_agent.act(state)
             new_state, reward, done, info = env.step(action)
-            experience.cache(state, new_state, action, reward, done)
+            variables_cur['kills'] = env.get_kill_count()
+            variables_cur['health'] = env.get_health()
+            variables_cur['ammo'] = env.get_ammo()
+            reward += env.get_reward(variables_cur,variables_prev)
+            variables_prev = variables_cur.copy()
+            experience.cache(state, new_state, action, reward/100, done)
             q, loss = ddqn_agent.learn()
             logger.log_step(reward, loss, q)
 
