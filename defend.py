@@ -143,7 +143,7 @@ class DoomAgent:
         self.learn_every = 3
 
         # Syncing parameters
-        self.syncing_frequency = 10000
+        self.syncing_frequency = 20000
 
         # Tracking the current step
         self.curr_step = 0
@@ -388,7 +388,7 @@ class MetricLogger:
 # 3. Implementing the Q learning pseudocode
 
 
-save_dir = Path("checkpoints") / "medic" /datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+save_dir = Path("checkpoints") / "defend" /datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 save_dir.mkdir(parents=True)
 
 ddqn_agent = DoomAgent(env.observation_space.shape, env.action_space.n, save_dir=save_dir)
