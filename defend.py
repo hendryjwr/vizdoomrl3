@@ -82,7 +82,7 @@ class SkipFrame(gym.Wrapper):
 
 
 env = SkipFrame(env, skip=4)
-env = ImagePreProcessing(env, shape=(90, 120))
+env = ImagePreProcessing(env, shape=(120, 160))
 env = FrameStack(env, num_stack=4)
 
 env.reset()
@@ -111,7 +111,7 @@ class DoomNN(nn.Module):
             nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(4928, 512),
+            nn.Linear(11264, 512),
             nn.ReLU(),
             nn.Linear(512, output_dim),
         )
@@ -131,19 +131,19 @@ class DoomAgent:
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.save_dir = save_dir
-        self.save_every = 20000
+        self.save_every = 50000
 
         # Learning Parameters
         self.gamma = 0.99
-        self.alpha = 0.0001  # 0.00025
+        self.alpha = 0.00025  # 0.00025
         self.current_epsilon = 1
-        self.epsilon_rate_decay = 0.999977
+        self.epsilon_rate_decay = 0.999995
         self.epsilon_rate_min = 0.1
 
         self.learn_every = 3
 
         # Syncing parameters
-        self.syncing_frequency = 2000
+        self.syncing_frequency = 10000
 
         # Tracking the current step
         self.curr_step = 0
@@ -195,7 +195,7 @@ class DoomAgent:
             self.save()
         if self.curr_step % self.learn_every != 0:
             return None, None
-        if self.curr_step < 2000:
+        if self.curr_step < 5000:
             return None, None
 
         # Step 1: Recall from memory
@@ -251,7 +251,7 @@ class DoomAgent:
 
 class ExperienceReplay:
     def __init__(self):
-        self.memory = deque(maxlen=10000)  # We leave this value at 100k for now
+        self.memory = deque(maxlen=9000)  # We leave this value at 100k for now
 
     def construct_tensor(self, value):
 
@@ -388,12 +388,30 @@ class MetricLogger:
 # 3. Implementing the Q learning pseudocode
 
 
-save_dir = Path("checkpoints") / "defend" /datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+save_dir = Path("checkpoints") / "defend" / datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 save_dir.mkdir(parents=True)
 
 ddqn_agent = DoomAgent(env.observation_space.shape, env.action_space.n, save_dir=save_dir)
 logger = MetricLogger(save_dir)
 experience = ExperienceReplay()
+
+
+def log_hyper_parameters():
+    f = open(str(save_dir) + "/Parameter_values.txt", "w")
+    f.write("Env is : " + str(env.__str__()) + '\n')
+    f.write("Image Size is: " + str(env.resize_shape) + '\n')
+    f.write("Memory size is: " + str(experience.memory.maxlen) + '\n')
+    f.write("GAMMA is: " + str(ddqn_agent.gamma) + '\n')
+    f.write("Batch size  is: " + str(mini_batch_size) + '\n')
+    f.write("Epsilon decay  is: " + str(ddqn_agent.epsilon_rate_decay) + '\n')
+    # f.write("Burn in  is: " + str(ddqn_agent.burn) + '\n') # To add
+    f.write("ALPHA is: " + str(ddqn_agent.alpha) + '\n')
+    f.write("Learn every is: " + str(ddqn_agent.learn_every) + '\n')
+    f.write("Syncing Frequency is: " + str(ddqn_agent.syncing_frequency) + '\n')
+    f.close()
+
+
+log_hyper_parameters()
 
 
 def play():
