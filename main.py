@@ -149,13 +149,13 @@ class DoomAgent:
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.save_dir = save_dir
-        self.save_every = 200000
+        self.save_every = 100000
 
         # Learning Parameters
         self.gamma = 0.99
-        self.alpha = 0.0025  # 0.00025
+        self.alpha = 0.00025  # 0.00025
         self.current_epsilon = 1
-        self.epsilon_rate_decay = 0.9999977
+        self.epsilon_rate_decay = 0.9999995
         self.epsilon_rate_min = 0.1
 
         self.burnin = 10000
@@ -270,7 +270,7 @@ class DoomAgent:
 
 class ExperienceReplay:
     def __init__(self):
-        self.memory = deque(maxlen=10000)  # We leave this value at 100k for now
+        self.memory = deque(maxlen=50000)  # We leave this value at 100k for now
 
     def construct_tensor(self, value):
 
@@ -407,7 +407,7 @@ class MetricLogger:
 # 3. Implementing the Q learning pseudocode
 
 
-save_dir = Path("checkpoints") / "corridor_exp_2" /datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+save_dir = Path("checkpoints") / "corridor_exp_3" /datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 save_dir.mkdir(parents=True)
 
 print(env.action_space.n)
