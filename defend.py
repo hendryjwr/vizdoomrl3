@@ -82,7 +82,7 @@ class SkipFrame(gym.Wrapper):
 
 
 env = SkipFrame(env, skip=4)
-env = ImagePreProcessing(env, shape=(120, 160))
+env = ImagePreProcessing(env, shape=(90, 120))
 env = FrameStack(env, num_stack=4)
 
 env.reset()
@@ -111,7 +111,7 @@ class DoomNN(nn.Module):
             nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(11264, 512),
+            nn.Linear(4928, 512),
             nn.ReLU(),
             nn.Linear(512, output_dim),
         )
@@ -137,7 +137,7 @@ class DoomAgent:
         self.gamma = 0.99
         self.alpha = 0.00025  # 0.00025
         self.current_epsilon = 1
-        self.epsilon_rate_decay = 0.999995
+        self.epsilon_rate_decay = 0.9999995
         self.epsilon_rate_min = 0.1
 
         self.learn_every = 3
@@ -195,7 +195,7 @@ class DoomAgent:
             self.save()
         if self.curr_step % self.learn_every != 0:
             return None, None
-        if self.curr_step < 5000:
+        if self.curr_step < 10000:
             return None, None
 
         # Step 1: Recall from memory
@@ -251,7 +251,7 @@ class DoomAgent:
 
 class ExperienceReplay:
     def __init__(self):
-        self.memory = deque(maxlen=9000)  # We leave this value at 100k for now
+        self.memory = deque(maxlen=30000)  # We leave this value at 100k for now
 
     def construct_tensor(self, value):
 
@@ -420,12 +420,17 @@ def play():
     for i in range(episodes):
 
         state = env.reset()
+        curr_ammo = env.get_ammo()
+        prev_ammo = curr_ammo
         done = False
 
         while not done:
 
             action = ddqn_agent.act(state)
             new_state, reward, done, info = env.step(action)
+            curr_ammo = env.get_ammo()
+            reward += env.get_reward(curr_ammo, prev_ammo)
+            prev_ammo = curr_ammo
             experience.cache(state, new_state, action, reward, done)
             q, loss = ddqn_agent.learn()
             logger.log_step(reward, loss, q)
