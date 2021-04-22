@@ -129,7 +129,7 @@ class DoomNN(nn.Module):
             nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(1536, 512),
+            nn.Linear(4928, 512),
             nn.ReLU(),
             nn.Linear(512, output_dim),
         )
@@ -153,11 +153,12 @@ class DoomAgent:
 
         # Learning Parameters
         self.gamma = 0.99
-        self.alpha = 0.00025  # 0.00025
+        self.alpha = 0.0025  # 0.00025
         self.current_epsilon = 1
-        self.epsilon_rate_decay = 0.99999975
+        self.epsilon_rate_decay = 0.9999977
         self.epsilon_rate_min = 0.1
 
+        self.burnin = 10000
         self.learn_every = 3
 
         # Syncing parameters
@@ -213,7 +214,7 @@ class DoomAgent:
             self.save()
         if self.curr_step % self.learn_every != 0:
             return None, None
-        if self.curr_step < 10000:
+        if self.curr_step < self.burnin:
             return None, None
 
         # Step 1: Recall from memory
@@ -269,7 +270,7 @@ class DoomAgent:
 
 class ExperienceReplay:
     def __init__(self):
-        self.memory = deque(maxlen=50000)  # We leave this value at 100k for now
+        self.memory = deque(maxlen=10000)  # We leave this value at 100k for now
 
     def construct_tensor(self, value):
 
@@ -406,7 +407,7 @@ class MetricLogger:
 # 3. Implementing the Q learning pseudocode
 
 
-save_dir = Path("checkpoints") / "medic" /datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+save_dir = Path("checkpoints") / "corridor_exp_2" /datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 save_dir.mkdir(parents=True)
 
 print(env.action_space.n)
@@ -428,6 +429,7 @@ def play():
 
         while not done:
             
+            env.render()
             action = ddqn_agent.act(state)
             new_state, reward, done, info = env.step(action)
             variables_cur['kills'] = env.get_kill_count()
