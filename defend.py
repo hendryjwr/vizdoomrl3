@@ -397,7 +397,7 @@ experience = ExperienceReplay()
 
 
 def log_hyper_parameters():
-    f = open("Parameter_values.txt", "w")
+    f = open(str(save_dir) + "/Parameter_values.txt", "w")
     f.write("Env is : " + str(env.__str__()) + '\n')
     f.write("Image Size is: " + str(env.resize_shape) + '\n')
     f.write("Memory size is: " + str(experience.memory.maxlen) + '\n')
