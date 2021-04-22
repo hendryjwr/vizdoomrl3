@@ -131,19 +131,19 @@ class DoomAgent:
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.save_dir = save_dir
-        self.save_every = 200000
+        self.save_every = 20000
 
         # Learning Parameters
         self.gamma = 0.99
-        self.alpha = 0.00025  # 0.00025
+        self.alpha = 0.0001  # 0.00025
         self.current_epsilon = 1
-        self.epsilon_rate_decay = 0.99999975
+        self.epsilon_rate_decay = 0.999977
         self.epsilon_rate_min = 0.1
 
         self.learn_every = 3
 
         # Syncing parameters
-        self.syncing_frequency = 20000
+        self.syncing_frequency = 2000
 
         # Tracking the current step
         self.curr_step = 0
@@ -195,7 +195,7 @@ class DoomAgent:
             self.save()
         if self.curr_step % self.learn_every != 0:
             return None, None
-        if self.curr_step < 10000:
+        if self.curr_step < 2000:
             return None, None
 
         # Step 1: Recall from memory
@@ -251,7 +251,7 @@ class DoomAgent:
 
 class ExperienceReplay:
     def __init__(self):
-        self.memory = deque(maxlen=30000)  # We leave this value at 100k for now
+        self.memory = deque(maxlen=10000)  # We leave this value at 100k for now
 
     def construct_tensor(self, value):
 
