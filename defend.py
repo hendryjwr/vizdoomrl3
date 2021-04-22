@@ -82,7 +82,7 @@ class SkipFrame(gym.Wrapper):
 
 
 env = SkipFrame(env, skip=4)
-env = ImagePreProcessing(env, shape=(90, 120))
+env = ImagePreProcessing(env, shape=(120, 160))
 env = FrameStack(env, num_stack=4)
 
 env.reset()
@@ -111,7 +111,7 @@ class DoomNN(nn.Module):
             nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(4928, 512),
+            nn.Linear(11264, 512),
             nn.ReLU(),
             nn.Linear(512, output_dim),
         )
@@ -251,7 +251,7 @@ class DoomAgent:
 
 class ExperienceReplay:
     def __init__(self):
-        self.memory = deque(maxlen=10000)  # We leave this value at 100k for now
+        self.memory = deque(maxlen=8000)  # We leave this value at 100k for now
 
     def construct_tensor(self, value):
 
