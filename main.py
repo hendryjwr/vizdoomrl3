@@ -415,6 +415,22 @@ ddqn_agent = DoomAgent(env.observation_space.shape, env.action_space.n, save_dir
 logger = MetricLogger(save_dir)
 experience = ExperienceReplay()
 
+def log_hyper_parameters():
+    f = open(str(save_dir) + "/Parameter_values.txt", "w")
+    f.write("Env is : " + str(env.__str__()) + '\n')
+    f.write("Image Size is: " + str(env.resize_shape) + '\n')
+    f.write("Memory size is: " + str(experience.memory.maxlen) + '\n')
+    f.write("GAMMA is: " + str(ddqn_agent.gamma) + '\n')
+    f.write("Batch size  is: " + str(mini_batch_size) + '\n')
+    f.write("Epsilon decay  is: " + str(ddqn_agent.epsilon_rate_decay) + '\n')
+    # f.write("Burn in  is: " + str(ddqn_agent.burn) + '\n') # To add
+    f.write("ALPHA is: " + str(ddqn_agent.alpha) + '\n')
+    f.write("Learn every is: " + str(ddqn_agent.learn_every) + '\n')
+    f.write("Syncing Frequency is: " + str(ddqn_agent.syncing_frequency) + '\n')
+    f.close()
+
+
+log_hyper_parameters()
 
 def play():
     episodes = 300000

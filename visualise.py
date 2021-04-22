@@ -19,7 +19,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Using device:', device)
 
 
-env = gym.make('VizdoomHealthGathering-v0')
+env = gym.make('VizdoomDefendCenter-v0')
 
 
 class ImagePreProcessing(gym.ObservationWrapper):
@@ -63,7 +63,7 @@ class SkipFrame(gym.Wrapper):
 
 
 env = SkipFrame(env, skip=4)
-env = ImagePreProcessing(env, shape=(60, 80))
+env = ImagePreProcessing(env, shape=(120, 160))
 env = FrameStack(env, num_stack=4)
 
 env.reset()
@@ -87,7 +87,7 @@ class DoomNN(nn.Module):
             nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(1536, 512),
+            nn.Linear(11264, 512),
             nn.ReLU(),
             nn.Linear(512, output_dim),
         )
@@ -172,7 +172,7 @@ class DoomAgent:
         self.neural_net.load_state_dict(state_dict)
         self.current_epsilon = current_epsilon
 
-checkpoint = Path('checkpoints/medic/2021-04-20T20-12-38/doom_net_5.pt')
+checkpoint = Path('checkpoints/defend/2021-04-22T11-44-57/doom_net_3.pt')
 ddqn_agent = DoomAgent(env.observation_space.shape, env.action_space.n, checkpoint=checkpoint)
 
 def vis():
