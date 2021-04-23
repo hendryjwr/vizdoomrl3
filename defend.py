@@ -420,17 +420,18 @@ def play():
     for i in range(episodes):
 
         state = env.reset()
-        curr_ammo = env.get_ammo()
-        prev_ammo = curr_ammo
+        variables_cur = {'health' : env.get_health(), 'ammo' : env.get_ammo()}
+        variables_prev = variables_cur.copy()
         done = False
 
         while not done:
 
             action = ddqn_agent.act(state)
             new_state, reward, done, info = env.step(action)
-            curr_ammo = env.get_ammo()
-            reward += env.get_reward(curr_ammo, prev_ammo)
-            prev_ammo = curr_ammo
+            variables_cur['health'] = env.get_health()
+            variables_cur['ammo'] = env.get_ammo()
+            reward += env.get_reward(variables_cur, variables_prev)
+            variables_prev = variables_cur.copy()
             experience.cache(state, new_state, action, reward, done)
             q, loss = ddqn_agent.learn()
             logger.log_step(reward, loss, q)
