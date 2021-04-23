@@ -82,7 +82,7 @@ class SkipFrame(gym.Wrapper):
 
 
 env = SkipFrame(env, skip=4)
-env = ImagePreProcessing(env, shape=(90, 120))
+env = ImagePreProcessing(env, shape=(64, 64))
 env = FrameStack(env, num_stack=4)
 
 env.reset()
@@ -111,7 +111,7 @@ class DoomNN(nn.Module):
             nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(4928, 512),
+            nn.Linear(1024, 512),
             nn.ReLU(),
             nn.Linear(512, output_dim),
         )
@@ -131,19 +131,19 @@ class DoomAgent:
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.save_dir = save_dir
-        self.save_every = 50000
+        self.save_every = 150000
 
         # Learning Parameters
         self.gamma = 0.99
-        self.alpha = 0.00025  # 0.00025
+        self.alpha = 0.0001  # 0.00025
         self.current_epsilon = 1
-        self.epsilon_rate_decay = 0.9999995
+        self.epsilon_rate_decay = 0.99999885
         self.epsilon_rate_min = 0.1
 
-        self.learn_every = 3
+        self.learn_every = 3 # Try this at 100
 
         # Syncing parameters
-        self.syncing_frequency = 10000
+        self.syncing_frequency = 3000
 
         # Tracking the current step
         self.curr_step = 0
@@ -195,7 +195,7 @@ class DoomAgent:
             self.save()
         if self.curr_step % self.learn_every != 0:
             return None, None
-        if self.curr_step < 10000:
+        if self.curr_step < 5000:
             return None, None
 
         # Step 1: Recall from memory
@@ -251,7 +251,7 @@ class DoomAgent:
 
 class ExperienceReplay:
     def __init__(self):
-        self.memory = deque(maxlen=30000)  # We leave this value at 100k for now
+        self.memory = deque(maxlen=40000)  # We leave this value at 100k for now
 
     def construct_tensor(self, value):
 
