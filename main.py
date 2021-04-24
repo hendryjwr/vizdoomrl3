@@ -150,14 +150,15 @@ class DoomAgent:
         self.action_dim = action_dim
         self.save_dir = save_dir
         self.save_every = 100000
+        self.num_of_steps = 2000000
 
         # Learning Parameters
         self.gamma = 0.99
         self.alpha = 0.00025  # 0.00025
         self.current_epsilon = 1
-        self.epsilon_rate_decay = 0.9999995
         self.epsilon_rate_min = 0.1
-
+        self.epsilon_rate_decay = pow(self.epsilon_rate_min, 1 / self.num_of_steps) # Number of steps for epsilon to decay to 0.1
+        
         self.burnin = 10000
         self.learn_every = 3
 
