@@ -83,6 +83,8 @@ def start():
             ddqn_agent.experience.cache(state, new_state, action, reward, done)
             score += reward
             q, loss = ddqn_agent.learn()
+            logger.log_step(reward, loss, q)
+
             state = new_state
             if done:
                 break
