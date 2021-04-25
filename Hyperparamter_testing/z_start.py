@@ -14,34 +14,62 @@ import gym
 
 def start():
     parser = argparse.ArgumentParser(description="trains model based on different paramters")
+    parser.add_argument('-env', type=str)
+    parser.add_argument('-width', type=int)
+    parser.add_argument('-height', type=int)
+    parser.add_argument('-flatten', type=int)
+    parser.add_argument('-episode_num', type=int)
+    parser.add_argument('-save_every', type=int)
     parser.add_argument('-alpha', type=float)
     parser.add_argument('-gamma', type=float)
-    parser.add_argument('-epsilon_rate_decay', type=float)
+    parser.add_argument('-num_of_steps_to_decay', type=int)
     parser.add_argument('-syncingfrequency', type=int)
     parser.add_argument('-batchsize', type=int)
     parser.add_argument('-memorysize', type=int)
+
     args = parser.parse_args()
+    image_size = (args.width, args.height)
 
-    env = gym.make('VizdoomCorridor-v0')
-    env = z_hyper_agent.SkipFrame(env, skip=4)
-    env = z_hyper_agent.ImagePreProcessing(env, shape=(90, 120))
-    env = FrameStack(env, num_stack=4)
-    env.reset()
-
+    env = gym.make(args.env)
     memory = z_hyper_agent.ExperienceReplay(args.memorysize, args.batchsize)
+
     current_time = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
     save_dir = Path("Neural saves") / current_time
     save_dir.mkdir(parents=True)
 
+    env = z_hyper_agent.SkipFrame(env, skip=4)
+    env = z_hyper_agent.ImagePreProcessing(env, shape=image_size)
+    env = FrameStack(env, num_stack=4)
+    logger = z_hyper_agent.MetricLogger(save_dir)
+
+    env.reset()
+
     ddqn_agent = z_hyper_agent.DoomAgent(env.observation_space.shape, env.action_space.n, save_dir=save_dir,
                                          memory=memory,
                                          gamma=args.gamma, alpha=args.alpha,
-                                         epsilon_rate_decay=args.epsilon_rate_decay,
-                                         syncingfrequency=args.syncingfrequency, minibatch=args.batchsize)
+                                         num_of_steps= args.num_of_steps_to_decay ,
+                                         syncingfrequency=args.syncingfrequency, minibatch=args.batchsize,
+                                         flatten=args.flatten, save_every=args.save_every)
 
     eps_history, scores = [], []
 
-    episodes =  50000
+    episodes = args.episode_num
+
+    def log_hyper_parameters():
+        f = open(str(save_dir) + "/Parameter_values.txt", "w")
+        f.write("Env is : " + str(env.__str__()) + '\n')
+        f.write("Image Size is: " + str(env.resize_shape) + '\n')
+        f.write("Memory size is: " + str(memory.memory.maxlen) + '\n')
+        f.write("GAMMA is: " + str(ddqn_agent.gamma) + '\n')
+        f.write("Batch size  is: " + str(args.batchsize) + '\n')
+        f.write("Epsilon decay  is: " + str(ddqn_agent.epsilon_rate_decay) + '\n')
+
+        f.write("ALPHA is: " + str(ddqn_agent.alpha) + '\n')
+        f.write("Learn every is: " + str(ddqn_agent.learn_every) + '\n')
+        f.write("Syncing Frequency is: " + str(ddqn_agent.syncing_frequency) + '\n')
+        f.close()
+
+    log_hyper_parameters()
 
     for i in range(episodes):
         state = env.reset()
@@ -58,6 +86,11 @@ def start():
             state = new_state
             if done:
                 break
+
+        logger.log_episode()
+
+        if i % 20 == 0:
+            logger.record(episode=i, epsilon=ddqn_agent.current_epsilon, step=ddqn_agent.curr_step)
 
         eps_history.append(ddqn_agent.current_epsilon)
         scores.append(score)
