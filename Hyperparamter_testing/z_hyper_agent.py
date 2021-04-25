@@ -218,7 +218,7 @@ class DoomAgent:
         return (current_q_values.mean().item(), loss_value)
 
     def td_estimate(self, current_state_array, action_array):
-        indexing_array = np.arange(0, self.mini_batch_size)
+        indexing_array = np.arange(0, self.mini_batch)
         current_q_values = self.neural_net(current_state_array, "online")[indexing_array, action_array]
         return current_q_values
 
