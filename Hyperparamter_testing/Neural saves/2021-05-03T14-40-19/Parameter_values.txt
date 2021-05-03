@@ -1,0 +1,9 @@
+Env is : <FrameStack<ImagePreProcessing<SkipFrame<VizdoomPredictPosition<VizdoomPredictPosition-v0>>>>>
+Image Size is: (90, 120)
+Memory size is: 55000
+GAMMA is: 0.99
+Batch size  is: 32
+Epsilon decay  is: 0.999997697417558
+ALPHA is: 0.00025
+Learn every is: 3
+Syncing Frequency is: 10000
