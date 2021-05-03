@@ -111,7 +111,6 @@ class DoomNN(nn.Module):
         self.linear_output = nn.Linear(512, output_dim)
 
     def forward(self, input):
-        # If it doesn't work come back here
         input = copy.deepcopy(input)
         fw_net = func.relu(self.conv_layer_1(input))
         fw_net = func.relu(self.conv_layer_2(fw_net))
@@ -138,9 +137,9 @@ class DoomAgent:
         self.current_epsilon = 1
         self.epsilon_rate_min = 0.1
         self.epsilon_rate_decay = pow(self.epsilon_rate_min,
-                                      1 / self.num_of_steps)  # Number of steps for epsilon to decay to 0.1
+                                      1 / self.num_of_steps)
 
-        self.burnin = 32
+        self.burnin = 10000
         self.learn_every = 3
 
         # Syncing parameters
@@ -236,7 +235,7 @@ class DoomAgent:
 
 class ExperienceReplay:
     def __init__(self):
-        self.memory = deque(maxlen=50000)  # We leave this value at 100k for now
+        self.memory = deque(maxlen=50000)
 
     def construct_tensor(self, value):
 
@@ -260,7 +259,6 @@ class ExperienceReplay:
 
         states = torch.reshape(torch.cat(states), (mini_batch_size, 4, 90, 120))
         next_states = torch.reshape(torch.cat(next_states), (mini_batch_size, 4, 90, 120))
-        # actions = torch.stack(actions, dim=1).squeeze()
         actions = torch.cat(actions).squeeze()
         rewards = torch.cat(rewards).squeeze()
         dones = torch.cat(dones).squeeze()
@@ -370,16 +368,13 @@ class MetricLogger:
             plt.clf()
 
 
-# summary(DoomNN((4, 120, 160), env.action_space.n), (4, 120, 160))
 
-# 2. Making the epsilon greedy policy
-# 3. Implementing the Q learning pseudocode
 
 
 save_dir = Path("checkpoints") / "corridor_exp_3" / datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 save_dir.mkdir(parents=True)
 
-print(env.action_space.n)
+
 ddqn_agent = DoomAgent(env.observation_space.shape, env.action_space.n, save_dir=save_dir)
 logger = MetricLogger(save_dir)
 experience = ExperienceReplay()
@@ -393,7 +388,7 @@ def log_hyper_parameters():
     f.write("GAMMA is: " + str(ddqn_agent.gamma) + '\n')
     f.write("Batch size  is: " + str(mini_batch_size) + '\n')
     f.write("Epsilon decay  is: " + str(ddqn_agent.epsilon_rate_decay) + '\n')
-    # f.write("Burn in  is: " + str(ddqn_agent.burn) + '\n') # To add
+    f.write("Burn in  is: " + str(ddqn_agent.burnin) + '\n')
     f.write("ALPHA is: " + str(ddqn_agent.alpha) + '\n')
     f.write("Learn every is: " + str(ddqn_agent.learn_every) + '\n')
     f.write("Syncing Frequency is: " + str(ddqn_agent.syncing_frequency) + '\n')
@@ -420,13 +415,6 @@ def play():
             q, loss = ddqn_agent.learn()
             logger.log_step(reward, loss, q)
 
-            # Step 1 Calculate td_estimate
-            # Step 2 Calculate td_target
-            # Step 3 Calculate loss
-            # Step 4 Backward propagation
-            # Step 5 Sync online and target networks
-            # Step 6 make new state, old state
-
             state = new_state
 
             if done:
@@ -440,9 +428,3 @@ def play():
 
 play()
 
-# TD estimate as was done in Mario
-# current_Q = self.net(state, model="online")[np.arange(0, self.batch_size), action]
-# TD estimate rewritten
-# current_Q = [0] * 32
-# for index, element in enumerate(states):
-# current_Q[index] = self.net(element, model="online")[action[index]]
