@@ -8,6 +8,7 @@ from collections import deque
 import random, datetime, os, copy, time
 from torchsummary import summary
 from torchvision import models
+import torch.nn.functional as func
 import gym
 from gym.spaces import Box
 from gym.wrappers import FrameStack
@@ -18,8 +19,8 @@ mini_batch_size = 32
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Using device:', device)
-print()
 
+# For debugging purposes
 if device.type == 'cuda':
     print(torch.cuda.device_count())
     print(torch.cuda.is_available())
@@ -30,7 +31,8 @@ if device.type == 'cuda':
     print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
     print('Max Cached:   ', round(torch.cuda.max_memory_reserved(0) / 1024 ** 3, 1), 'GB')
 
-env = gym.make('VizdoomCorridor-v0')
+env = gym.make('VizdoomPredictPosition-v0')
+
 
 class ImagePreProcessing(gym.ObservationWrapper):
 
@@ -45,16 +47,15 @@ class ImagePreProcessing(gym.ObservationWrapper):
         state = np.transpose(state, (2, 0, 1))
         to_convert = state.copy()
         converted_state = torch.tensor(to_convert, dtype=torch.float32)
-        transform = transforms.Grayscale()
-        converted_state = transform(converted_state)
+        rgb_to_grayscale = transforms.Grayscale()
+        converted_state = rgb_to_grayscale(converted_state)
 
         # Applies resizing
-
         transformation = transforms.Compose([transforms.Resize(self.resize_shape), transforms.Normalize(0, 255)])
         # Uncomment this is for visualization
         # transformation = transforms.Resize(self.resize_shape)
-        observation = transformation(converted_state).squeeze(0)
-        return observation
+        processed_state = transformation(converted_state).squeeze(0)
+        return processed_state
 
 
 def visualise(state, i):
@@ -71,32 +72,13 @@ class SkipFrame(gym.Wrapper):
         self.frames_to_skip = skip
 
     def step(self, action):
-        reward_sum = 0.0
+        reward_sum = 0
         for _ in range(self.frames_to_skip):
             new_state, reward, done, info = self.env.step(action)
             reward_sum += reward
             if done:
                 break
         return new_state, reward_sum, done, info
-
-
-class ResizeObservation(gym.ObservationWrapper):
-    def __init__(self, env, shape):
-        super().__init__(env)
-        self.shape = shape
-        # print('before', self.observation_space.shape, self.shape)
-        # obs_shape = self.shape + self.observation_space.shape[2:]
-        # print('after', obs_shape)
-        self.observation_space = Box(low=0, high=255, shape=self.shape, dtype=np.uint8)
-
-    def observation(self, observation):
-        # transformation = transforms.Compose(
-        #     [transforms.Resize(self.shape), transforms.Normalize(0, 255)]
-        # )
-        # Uncomment this is for visualization
-        transformation = transforms.Resize(self.shape)
-        observation = transformation(observation).squeeze(0)
-        return observation
 
 
 env = SkipFrame(env, skip=4)
@@ -121,25 +103,23 @@ class DoomNN(nn.Module):
     def __init__(self, input_image, output_dim):
         super().__init__()
         c, h, w = input_image
-        self.online = nn.Sequential(
-            nn.Conv2d(in_channels=c, out_channels=32, kernel_size=8, stride=4),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
-            nn.ReLU(),
-            nn.Flatten(),
-            nn.Linear(4928, 512),
-            nn.ReLU(),
-            nn.Linear(512, output_dim),
-        )
-        self.target = copy.deepcopy(self.online)
+        # The CNN hyper-parameters were selected based  on: https://arxiv.org/abs/1509.06461
+        self.conv_layer_1 = nn.Conv2d(in_channels=c, out_channels=32, kernel_size=8, stride=4)
+        self.conv_layer_2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2)
+        self.conv_layer_3 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1)
+        self.linear_1 = nn.Linear(4928, 512)
+        self.linear_output = nn.Linear(512, output_dim)
 
-    def forward(self, input, model):
-        if model == "online":
-            return self.online(input)
-        elif model == "target":
-            return self.target(input)
+    def forward(self, input):
+        # If it doesn't work come back here
+        input = copy.deepcopy(input)
+        fw_net = func.relu(self.conv_layer_1(input))
+        fw_net = func.relu(self.conv_layer_2(fw_net))
+        fw_net = func.relu(self.conv_layer_3(fw_net))
+        fw_net = torch.flatten(fw_net, 1)
+        fw_net = func.relu(self.linear_1(fw_net))
+        fw_net = self.linear_output(fw_net)
+        return fw_net
 
 
 class DoomAgent:
@@ -157,9 +137,10 @@ class DoomAgent:
         self.alpha = 0.00025  # 0.00025
         self.current_epsilon = 1
         self.epsilon_rate_min = 0.1
-        self.epsilon_rate_decay = pow(self.epsilon_rate_min, 1 / self.num_of_steps) # Number of steps for epsilon to decay to 0.1
-        
-        self.burnin = 10000
+        self.epsilon_rate_decay = pow(self.epsilon_rate_min,
+                                      1 / self.num_of_steps)  # Number of steps for epsilon to decay to 0.1
+
+        self.burnin = 32
         self.learn_every = 3
 
         # Syncing parameters
@@ -168,15 +149,14 @@ class DoomAgent:
         # Tracking the current step
         self.curr_step = 0
 
-        # Mario's DNN to predict the most optimal action - we implement this in the Learn section
-        self.neural_net = DoomNN(self.state_dim, self.action_dim).float()
+        self.nn_online = DoomNN(self.state_dim, self.action_dim).float()
+        self.nn_target = DoomNN(self.state_dim, self.action_dim).float()
 
-        # We
-        self.optimizer = torch.optim.Adam(self.neural_net.parameters(), self.alpha)
+        self.optimizer = torch.optim.Adam(self.nn_online.parameters(), self.alpha)
         self.loss_func = torch.nn.SmoothL1Loss()
 
         if torch.cuda.is_available():
-            self.neural_net = self.neural_net.to(device="cuda")
+            self.nn_online = self.nn_online.to(device="cuda")
 
     def act(self, state):
 
@@ -195,7 +175,7 @@ class DoomAgent:
             state = state.__array__()
             state = construct_tensor(state)
             state = state.unsqueeze(0)
-            action_values = self.neural_net(state, model="online")
+            action_values = self.nn_online(state)
             action_idx = torch.argmax(action_values, axis=1).item()
 
         # decrease exploration_rate
@@ -210,7 +190,7 @@ class DoomAgent:
     def learn(self):
 
         if self.curr_step % self.syncing_frequency == 0:
-            self.neural_net.target.load_state_dict(self.neural_net.online.state_dict())
+            self.nn_target.load_state_dict(self.nn_online.state_dict())
         if self.curr_step % self.save_every == 0:
             self.save()
         if self.curr_step % self.learn_every != 0:
@@ -218,53 +198,38 @@ class DoomAgent:
         if self.curr_step < self.burnin:
             return None, None
 
-        # Step 1: Recall from memory
-        current_state_array, new_state_array, action_array, reward_array, done_array = experience.recall()
+        current_q_values, loss = self.update(experience.recall())
 
-        # Step 2: Calculate TD estimate based on the online network
-        current_q_values = self.td_estimate(current_state_array, action_array)
+        return (current_q_values.mean().item(), loss)
 
-        # Step 3: Calculate TD target
-        target_q_values = self.td_target(new_state_array, reward_array, done_array)
+    def update(self, memory):
 
-        # Step 4: Perform gradient descent
-        loss_value = self.update(current_q_values, target_q_values)
+        current_state_array, new_state_array, action_array, reward_array, done_array = memory
 
-        # Step 5: Sync online network with target network
+        # TD_estimate
+        indexing_array = range(mini_batch_size)
+        current_q_values = self.nn_online(current_state_array)[indexing_array, action_array]
 
-        return (current_q_values.mean().item(), loss_value)
-
-    def td_estimate(self, current_state_array, action_array):
-        indexing_array = np.arange(0, mini_batch_size)
-        current_q_values = self.neural_net(current_state_array, "online")[indexing_array, action_array]
-        return current_q_values
-
-    def td_target(self, next_state, reward, done):
-
-        future_q_values = self.neural_net(next_state, "online")
+        # TD_target
+        future_q_values = self.nn_online(new_state_array)
         best_action_array = torch.argmax(future_q_values, axis=1)
+        target_q_values = self.nn_target(new_state_array)[indexing_array, best_action_array]
+        q_target = (reward_array + (1 - done_array.float()) * self.gamma * target_q_values).to(torch.float32)
 
-        indexing_array = np.arange(0, mini_batch_size)
-        target_q_values = self.neural_net(next_state, "target")[indexing_array, best_action_array]
-
-        return (reward + (1 - done.float()) * self.gamma * target_q_values).to(torch.float32)
-
-    def update(self, current_q_values, target_q_values):
-
-        # Here parameter = neural network weights
-        loss = self.loss_func(current_q_values, target_q_values)
+        # Apply gradient descent
+        loss = self.loss_func(current_q_values, q_target)
         loss.backward()
         self.optimizer.step()
         self.optimizer.zero_grad()
-        return loss.item()
 
-    # Save function from https://github.com/yuansongFeng/MadMario/ to work alongsite logging features.
+        return current_q_values, loss.item()
+
     def save(self):
         save_path = (
                 self.save_dir / f"doom_net_{int(self.curr_step // self.save_every)}.pt"
         )
         torch.save(
-            dict(model=self.neural_net.state_dict(), exploration_rate=self.current_epsilon),
+            dict(model=self.nn_online.state_dict(), exploration_rate=self.current_epsilon),
             save_path,
         )
 
@@ -287,16 +252,19 @@ class ExperienceReplay:
         action = construct_tensor([action])
         reward = construct_tensor([reward])
         done = construct_tensor([done])
-
         self.memory.append((current_state, new_state, action, reward, done))
 
     def recall(self):
 
-        # 100% to change later
-        batch = random.sample(self.memory, mini_batch_size)
-        state, next_state, action, reward, done = map(torch.stack, zip(*batch))
+        states, next_states, actions, rewards, dones = zip(*random.sample(self.memory, mini_batch_size))
 
-        return state, next_state, action.squeeze(), reward.squeeze(), done.squeeze()
+        states = torch.reshape(torch.cat(states), (mini_batch_size, 4, 90, 120))
+        next_states = torch.reshape(torch.cat(next_states), (mini_batch_size, 4, 90, 120))
+        # actions = torch.stack(actions, dim=1).squeeze()
+        actions = torch.cat(actions).squeeze()
+        rewards = torch.cat(rewards).squeeze()
+        dones = torch.cat(dones).squeeze()
+        return states, next_states, actions, rewards, dones
 
 
 # The following class is taken from https://github.com/yuansongFeng/MadMario/ for metric logging of data. 
@@ -408,13 +376,14 @@ class MetricLogger:
 # 3. Implementing the Q learning pseudocode
 
 
-save_dir = Path("checkpoints") / "corridor_exp_3" /datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+save_dir = Path("checkpoints") / "corridor_exp_3" / datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 save_dir.mkdir(parents=True)
 
 print(env.action_space.n)
 ddqn_agent = DoomAgent(env.observation_space.shape, env.action_space.n, save_dir=save_dir)
 logger = MetricLogger(save_dir)
 experience = ExperienceReplay()
+
 
 def log_hyper_parameters():
     f = open(str(save_dir) + "/Parameter_values.txt", "w")
@@ -433,28 +402,21 @@ def log_hyper_parameters():
 
 log_hyper_parameters()
 
+
 def play():
     episodes = 300000
 
     for i in range(episodes):
 
         state = env.reset()
-        variables_cur = {'kills' : env.get_kill_count(), 'health' : env.get_health(), 
-            'ammo' : env.get_ammo()}
-        variables_prev = variables_cur.copy()
         done = False
 
         while not done:
-            
-            env.render()
+
+            # env.render()
             action = ddqn_agent.act(state)
             new_state, reward, done, info = env.step(action)
-            variables_cur['kills'] = env.get_kill_count()
-            variables_cur['health'] = env.get_health()
-            variables_cur['ammo'] = env.get_ammo()
-            reward += env.get_reward(variables_cur,variables_prev)
-            variables_prev = variables_cur.copy()
-            experience.cache(state, new_state, action, reward/100, done)
+            experience.cache(state, new_state, action, reward, done)
             q, loss = ddqn_agent.learn()
             logger.log_step(reward, loss, q)
 
