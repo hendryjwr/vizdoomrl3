@@ -1,0 +1,9 @@
+Env is : <FrameStack<ImagePreProcessing<SkipFrame<VizdoomDefendLine<VizdoomDefendLine-v0>>>>>
+Image Size is: (90, 120)
+Memory size is: 55000
+GAMMA is: 0.99
+Batch size  is: 32
+Epsilon decay  is: 0.9999988487081163
+ALPHA is: 0.0007
+Learn every is: 3
+Syncing Frequency is: 10000
