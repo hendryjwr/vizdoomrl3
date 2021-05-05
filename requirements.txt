@@ -29,7 +29,7 @@ Markdown==3.3.4
 matplotlib==3.4.1
 networkx==2.5.1
 nodeenv==1.5.0
-numpy==1.19.5
+numpy==1.20.2
 oauthlib==3.1.0
 opt-einsum==3.3.0
 pandas==1.2.3
@@ -51,10 +51,6 @@ scikit-image==0.18.1
 scipy==1.6.2
 six==1.15.0
 stable-baselines3==1.0
-tensorboard==2.4.1
-tensorboard-plugin-wit==1.8.0
-tensorflow==2.4.1
-tensorflow-estimator==2.4.0
 termcolor==1.1.0
 tifffile==2021.3.31
 toml==0.10.2
@@ -68,4 +64,3 @@ virtualenv==20.4.3
 Werkzeug==1.0.1
 wrapt==1.12.1
 zipp==3.4.1
-
